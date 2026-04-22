@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Operation, ExecState, methodColors, getExample } from '../Interfaces';
+import JsonViewer from './JsonViewer';
+import { Operation, ExecState, getExample } from '../Interfaces';
 
 interface EndpointCardProps {
   path: string;
@@ -11,254 +12,154 @@ interface EndpointCardProps {
   execute: (path: string, method: string, operation: Operation, key: string) => Promise<void>;
   expandedEndpoints: Set<string>;
   toggleEndpoint: (key: string) => void;
+  darkMode?: boolean;
 }
 
-const JsonViewer: React.FC<{ data: unknown }> = ({ data }) => {
-  const [copied, setCopied] = useState(false);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-
-  const toggleCollapse = (path: string) => {
-    setCollapsed(prev => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const renderValue = (value: unknown, path: string, isLast: boolean): React.ReactNode => {
-    if (value === null) return <span className="text-rose-400">null</span>;
-    if (typeof value === 'boolean') return <span className="text-amber-400">{String(value)}</span>;
-    if (typeof value === 'number') return <span className="text-blue-400">{String(value)}</span>;
-    if (typeof value === 'string') return <span className="text-emerald-300">"{value}"</span>;
-
-    if (Array.isArray(value)) {
-      if (value.length === 0) return <span className="text-gray-400">[]</span>;
-      const isCollapsed = collapsed.has(path);
-      return (
-        <span>
-          <button onClick={() => toggleCollapse(path)} className="text-gray-400 hover:text-gray-300 mr-1 text-xs">
-            {isCollapsed ? '▶' : '▼'}
-          </button>
-          <span className="text-gray-500">[{isCollapsed ? '...' : ''}</span>
-          {!isCollapsed && value.map((item, i) => (
-            <div key={i} className="ml-4 pl-2 border-l border-gray-600">
-              {renderValue(item, `${path}[${i}]`, i === value.length - 1)}
-              {i < value.length - 1 && <span className="text-gray-500">,</span>}
-            </div>
-          ))}
-          <span className="text-gray-500">]{!isCollapsed && !isLast && ','}</span>
-        </span>
-      );
-    }
-
-    if (typeof value === 'object') {
-      const entries = Object.entries(value as Record<string, unknown>);
-      if (entries.length === 0) return <span className="text-gray-400">{'{}'}</span>;
-      const isCollapsed = collapsed.has(path);
-      return (
-        <span>
-          <button onClick={() => toggleCollapse(path)} className="text-gray-400 hover:text-gray-300 mr-1 text-xs">
-            {isCollapsed ? '▶' : '▼'}
-          </button>
-          <span className="text-gray-500">{'{'}{isCollapsed ? '...' : ''}</span>
-          {!isCollapsed && entries.map(([k, v], i) => (
-            <div key={k} className="ml-4 pl-2 border-l border-gray-600">
-              <span className="text-purple-400">"{k}"</span>
-              <span className="text-gray-500">: </span>
-              {renderValue(v, `${path}.${k}`, i === entries.length - 1)}
-            </div>
-          ))}
-          <span className="text-gray-500">{'}'}{!isCollapsed && !isLast && ','}</span>
-        </span>
-      );
-    }
-    return null;
-  };
-
-  return (
-    <div className="relative group font-mono text-sm">
-      <button
-        onClick={copyToClipboard}
-        className="absolute top-2 right-2 px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        {copied ? '✓ Copied' : '📋 Copy'}
-      </button>
-      <pre className="text-sm leading-relaxed">
-        {renderValue(data, 'root', true)}
-      </pre>
-    </div>
-  );
-};
-
 export const EndpointCard: React.FC<EndpointCardProps> = ({
-  path,
-  method,
-  operation,
-  idx,
-  getExecState,
-  setExecState,
-  execute,
-  expandedEndpoints,
-  toggleEndpoint,
+  path, method, operation, idx, getExecState, setExecState, execute, expandedEndpoints, toggleEndpoint, darkMode = true,
 }) => {
   const key = `${path}-${method}-${idx}`;
   const state = getExecState(key);
   const isExpanded = expandedEndpoints.has(key);
   const contentType = Object.keys(operation.requestBody?.content || {})[0];
   const isMultipart = contentType?.includes('multipart/form-data');
+  const [showCurl, setShowCurl] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  return (
-    <article className="relative border rounded-xl dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
-      <button
-        onClick={() => toggleEndpoint(key)}
-        className="w-full px-5 py-4 flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-      >
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${methodColors[method]}`}>
-          {method}
-        </span>
-        <div className="flex-1 min-w-0">
-          <code className="text-base font-mono text-gray-700 dark:text-gray-300 block truncate">
-            {path}
-          </code>
-          <h4 className="text-base font-serif font-semibold text-gray-900 dark:text-white truncate">
-            {operation.summary}
-          </h4>
-        </div>
-        <span className="text-lg text-gray-400 dark:text-gray-500">
-          {isExpanded ? '▲' : '▼'}
-        </span>
-      </button>
+  const generateCurl = () => {
+    const baseUrl = 'http://localhost:3000';
+    const lines: string[] = [];
+    const params = Object.entries(state.params).filter(([, v]) => v);
+    let fullUrl = baseUrl + path;
+    if (params.length > 0) fullUrl += '?' + params.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+    lines.push(`curl -X ${method.toUpperCase()} '${fullUrl}'`);
+    if (isMultipart && state.file) {
+      lines.push(`  -F file=@${state.file.name}`);
+    } else if (!['get', 'delete'].includes(method)) {
+      const bodyContent = state.body || JSON.stringify(getExample(operation));
+      const jsonBody = bodyContent.trim();
+      if (jsonBody && jsonBody.startsWith('{')) {
+        lines.push(`  -H 'Content-Type: application/json'`);
+        try {
+          const parsed = JSON.parse(jsonBody);
+          const formatted = JSON.stringify(parsed, null, 2);
+          const indented = formatted.split('\n').map((l, i) => i === 0 ? l : `  ${l}`).join('\n');
+          lines.push(`  -d '${indented.replace(/'/g, "'\\''")}'`);
+        } catch { lines.push(`  -d '${jsonBody.replace(/'/g, "'\\''")}'`); }
+      } else if (jsonBody) {
+        lines.push(`  -H 'Content-Type: application/json'`);
+        lines.push(`  -d '${jsonBody.replace(/'/g, "'\\''")}'`);
+      }
+    }
+    return lines.join(' \\\n');
+  };
 
-      {isExpanded && (
-        <div className="px-5 pb-5 border-t border-gray-100 dark:border-gray-700">
-          {operation.description && (
-            <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed mt-4 mb-4">
-              {operation.description}
-            </p>
-          )}
+  const handleCopyCurl = () => { navigator.clipboard.writeText(generateCurl()); setCopied(true); setTimeout(() => setCopied(false), 2000); };
 
-          {operation.parameters && operation.parameters.length > 0 && (
-            <div className="mb-4">
-              <h5 className="text-sm uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">
-                Parameters
-              </h5>
-              <div className="space-y-2">
-                {operation.parameters.map((param, i) => (
-                  <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <code className="text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-800 dark:text-gray-200">
-                        {param.name}
-                      </code>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">{param.in}</span>
-                      {param.required && <span className="text-xs text-rose-500">required</span>}
-                    </div>
-                    {param.description && (
-                      <span className="text-gray-500 dark:text-gray-400 sm:ml-auto">{param.description}</span>
-                    )}
-                    {param.in !== 'path' && (
-                      <input
-                        type="text"
-                        placeholder="value"
-                        value={state.params[param.name] || ''}
-                        onChange={e => setExecState(key, { params: { ...state.params, [param.name]: e.target.value } })}
-                        className="px-3 py-1 text-sm rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 w-full sm:w-36"
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+  const border = darkMode ? 'border-gray-600' : 'border-gray-200';
+  const text = darkMode ? 'text-white' : 'text-gray-900';
+  const text2 = darkMode ? 'text-gray-300' : 'text-gray-600';
+  const text3 = darkMode ? 'text-gray-400' : 'text-gray-500';
+  const bg = darkMode ? 'bg-gray-600' : 'bg-gray-200';
+  const bg2 = darkMode ? 'bg-gray-700' : 'bg-white';
+  const bg3 = darkMode ? 'bg-gray-900' : 'bg-gray-50';
+  const methodColor = method === 'get' ? 'text-blue-400' : method === 'post' ? 'text-green-400' : method === 'put' ? 'text-orange-400' : method === 'delete' ? 'text-red-400' : 'text-gray-400';
+  const methodBg = method === 'get' ? 'bg-blue-500' : method === 'post' ? 'bg-green-500' : method === 'put' ? 'bg-orange-500' : method === 'delete' ? 'bg-red-500' : 'bg-gray-500';
 
-          {operation.requestBody && (
-            <div className="mb-4">
-              <h5 className="text-sm uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">
-                Request Body
-              </h5>
-              {isMultipart ? (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">📎 Upload File</label>
-                    <input
-                      type="file"
-                      onChange={e => setExecState(key, { file: e.target.files?.[0] || null })}
-                      className="w-full px-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                    {state.file && <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">✓ Selected: {state.file.name}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">Additional JSON (optional)</label>
-                    <textarea
-                      value={state.body || '{}'}
-                      onChange={e => setExecState(key, { body: e.target.value })}
-                      rows={3}
-                      placeholder='{"title": "My Story"}'
-                      className="w-full px-4 py-3 text-sm font-mono rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-800 dark:bg-gray-900 text-emerald-400 resize-y"
-                    />
-                  </div>
+  const ExpandedView = () => {
+
+    return (<div className={`mt-6 pt-6 border-t ${border}`}>
+      {operation.parameters && operation.parameters.length > 0 && (
+        <div className="mb-6">
+          <h5 className={`text-sm font-medium mb-3 ${text}`}>Parameters</h5>
+          <div className="space-y-4">
+            {operation.parameters.map((param, i) => (
+              <div key={i} className="flex flex-col sm:flex-row sm:items-start gap-2">
+                <div className="flex items-center gap-2 min-w-[150px]">
+                  <code className={`text-sm px-2 py-1 rounded ${bg2} ${text}`}>{param.name}</code>
+                  <span className={`text-xs ${text3}`}>{param.in}</span>
+                  {param.required && <span className="text-xs text-rose-400">required</span>}
                 </div>
-              ) : (
-                <textarea
-                  value={state.body || JSON.stringify(getExample(operation), null, 2)}
-                  onChange={e => setExecState(key, { body: e.target.value })}
-                  rows={5}
-                  className="w-full px-4 py-3 text-sm font-mono rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-800 dark:bg-gray-900 text-emerald-400 resize-y"
-                />
-              )}
-            </div>
-          )}
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => execute(path, method, operation, key)}
-              disabled={state.loading}
-              className="px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full font-medium hover:bg-gray-700 dark:hover:bg-gray-200 disabled:opacity-50 transition-colors text-sm"
-            >
-              {state.loading ? 'Sending...' : 'Try it'}
-            </button>
-            {state.response && (
-              <span className={`text-sm ${
-                state.response.status >= 200 && state.response.status < 300 ? 'text-emerald-600 dark:text-emerald-400' :
-                state.response.status >= 400 ? 'text-rose-600 dark:text-rose-400' :
-                'text-amber-600 dark:text-amber-400'
-              }`}>
-                {state.response.status} {state.response.statusText} · {state.response.time}ms
-              </span>
-            )}
+                {param.description && <span className={text3}>{param.description}</span>}
+                {param.in !== 'path' && (
+                  <input type="text" placeholder="value" value={state.params[param.name] || ''} onChange={e => setExecState(key, { params: { ...state.params, [param.name]: e.target.value } })} className={`px-3 py-2 text-sm rounded border ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'} w-full sm:w-48`} />
+                )}
+              </div>
+            ))}
           </div>
+        </div>
+      )}
 
-          {state.response?.body && (
-            <div className="mt-4">
-              <h5 className="text-sm uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">Response</h5>
-              <div className="bg-gray-800 dark:bg-gray-950 p-4 rounded-xl max-h-128 overflow-auto">
-                <JsonViewer data={state.response.body} />
+      {operation.requestBody && (
+        <div className="mb-6">
+          <h5 className={`text-sm font-medium mb-3 ${text}`}>Request Body</h5>
+          {isMultipart ? (
+            <div className="space-y-4">
+              <div>
+                <label className={`block text-sm mb-2 ${text2}`}>File</label>
+                <input type="file" onChange={e => setExecState(key, { file: e.target.files?.[0] || null })} className={`w-full px-4 py-3 text-sm rounded-lg border ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
+                {state.file && <p className="mt-2 text-sm text-green-400">Selected: {state.file.name}</p>}
+              </div>
+              <div>
+                <label className={`block text-sm mb-2 ${text2}`}>Additional JSON (optional)</label>
+                <textarea value={state.body || '{}'} onChange={e => setExecState(key, { body: e.target.value })} rows={4} className={`w-full px-4 py-3 text-sm font-mono rounded-lg border resize-y ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
               </div>
             </div>
-          )}
-          {operation.responses && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {Object.entries(operation.responses).map(([code, response]) => (
-                <span key={code} className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-                  code.startsWith('2') ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300' :
-                  code.startsWith('4') ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300' :
-                  code.startsWith('5') ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300' :
-                  'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-                }`}>
-                  <span className="font-mono">{code}</span>
-                  {response.description && <span>{response.description}</span>}
-                </span>
-              ))}
-            </div>
+          ) : (
+            <textarea value={state.body || JSON.stringify(getExample(operation), null, 2)} onChange={e => setExecState(key, { body: e.target.value })} rows={6} className={`w-full px-4 py-3 text-sm font-mono rounded-lg border resize-y ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
           )}
         </div>
       )}
+
+      <div className="flex items-center gap-4">
+        <button onClick={() => execute(path, method, operation, key)} disabled={state.loading} className={`px-6 py-3 rounded-lg font-medium transition-colors text-sm ${darkMode ? 'bg-white text-gray-900 hover:bg-gray-200' : 'bg-gray-800 text-white hover:bg-gray-700'} disabled:opacity-50`}>
+          {state.loading ? 'Sending...' : 'Try it'}
+        </button>
+        <button onClick={() => setShowCurl(!showCurl)} className={`px-4 py-2 text-sm transition-colors ${text3} hover:${text}`}>{showCurl ? 'Hide cURL' : 'Copy cURL'}</button>
+        {state.response && <span className={`text-sm ${state.response.status >= 200 && state.response.status < 300 ? 'text-green-400' : state.response.status >= 400 ? 'text-red-400' : 'text-yellow-400'}`}>{state.response.status} {state.response.statusText} · {state.response.time}ms</span>}
+      </div>
+
+      {showCurl && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2"><h5 className={`text-sm font-medium ${text}`}>cURL</h5><button onClick={handleCopyCurl} className={`text-xs ${text3} hover:${text}`}>{copied ? '✓ Copied!' : 'Copy'}</button></div>
+          <div className={`w-full py-3 px-4 rounded-xl ${bg3} overflow-x-auto`}><pre className={`font-mono text-sm whitespace-pre-wrap ${text}`}><code>{generateCurl()}</code></pre></div>
+        </div>
+      )}
+
+      {state.response?.body && (<div className="mt-6"><h5 className={`text-sm font-medium mb-3 ${text}`}>Response</h5><div className={`p-4 rounded-lg max-h-96 overflow-auto ${bg3}`}><JsonViewer data={state.response.body} /></div></div>)}
+      {operation.responses && (
+        <div className="mt-6 flex flex-wrap gap-2">
+          {Object.entries(operation.responses).map(([code, response]) => (
+            <span key={code} className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm ${code.startsWith('2') ? (darkMode ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-800') : code.startsWith('4') ? (darkMode ? 'bg-yellow-900/50 text-yellow-300' : 'bg-yellow-100 text-yellow-800') : code.startsWith('5') ? (darkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-800') : (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-800')}`}>
+              <span className="font-medium">{code}</span>
+              {response.description && <span>{response.description}</span>}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>)
+  }
+
+  const MainView = () => {
+    return (<button onClick={() => toggleEndpoint(key)} className="w-full text-left group flex gap-4">
+      <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${methodBg}`} />
+      <div className="flex-1">
+        <div className="flex items-center gap-3 mb-2">
+          <span className={`text-xs font-medium uppercase tracking-wider ${methodColor}`}>{method}</span>
+          <span className={`text-sm font-mono ${text3}`}>{path}</span>
+          <span className={`ml-auto text-sm ${text3}`}>{isExpanded ? '▲ Less' : '▼ More'}</span>
+        </div>
+        <h4 className={`text-xl font-serif font-semibold mb-2 ${text} group-hover:text-blue-400 transition-colors`}>{operation.summary}</h4>
+        {operation.description && <p className={`${text2} text-lg leading-relaxed mb-6`}>{operation.description}</p>}
+      </div>
+    </button>)
+  }
+
+  return (
+    <article className={`border-b ${border} pb-8 mb-8 last:border-0`}>
+
+      <MainView />
+      {isExpanded && <ExpandedView />}
     </article>
   );
 };

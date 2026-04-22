@@ -6,7 +6,7 @@
     "skipLibCheck": true,
     "strict": false,
     "jsx": "react-jsx",
-    "moduleResolution": "Node",
+    "moduleResolution": "bundler",
     "noEmit": true,
     "allowSyntheticDefaultImports": true,
   },

@@ -13,8 +13,8 @@
   "paths": {
     "/upload": {
       "post": {
-        "summary": "Upload a PDF file",
-        "description": "Upload a PDF file to the server",
+        "summary": "Upload a PDF file 📄",
+        "description": "Upload a PDF file to the server for processing. The file will be stored securely and can be searched later using the search endpoint. Supported formats: PDF only. Maximum file size: 10MB.",
         "operationId": "uploadFile",
         "requestBody": {
           "content": {
