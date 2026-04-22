@@ -58,11 +58,11 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 ---
 
-If you find this useful, consider supporting my work!
+<!-- If you find this useful, consider supporting my work!
 
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-orange?style=for-the-badge)](https://ko-fi.com/yourusername)
 
 Or tip via:
 - [Ko-fi](https://ko-fi.com/yourusername)
 - [Buy Me a Coffee](https://buymeacoffee.com/yourusername)
-- [PayPal](https://paypal.me/yourusername)
+- [PayPal](https://paypal.me/yourusername) -->
