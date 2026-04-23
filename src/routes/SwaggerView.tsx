@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { EndpointCard } from '../components/EndpointCard';
 import { OpenAPISchema, Operation, ExecState, getExample } from '../Interfaces';
 
@@ -13,6 +13,10 @@ const SwaggerView: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState<string>('');
   const [startModalOpen, setStartModalOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
+
+  useEffect(() => {
+    document.body.className = darkMode ? 'bg-gray-800' : 'bg-gray-100';
+  }, [darkMode]);
 
   const toggleDarkMode = () => setDarkMode(prev => !prev);
   const toggleEndpoint = (key: string) => {
@@ -311,8 +315,8 @@ const SwaggerView: React.FC = () => {
     );
   };
 
-  return (
-  <div className="flex flex-col h-screen overflow-hidden">
+return (
+  <div className="flex flex-col min-h-screen overflow-x-hidden">
     {/* Header FULL WIDTH */}
     <Header />
 
@@ -416,12 +420,12 @@ const SwaggerView: React.FC = () => {
 
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex min-h-screen overflow-x-hidden">
       {spec && <SideBar />}
       <div className="flex flex-col flex-1">
         <Header />
 
-        <main className={`flex-1 overflow-y-auto p-6 ${bg}`} style={{ height: 'calc(100vh - 4rem)' }}>
+        <main className={`flex-1 overflow-y-auto p-6 ${bg}`} style={{ minHeight: 'calc(100vh - 4rem)' }}>
           <div className="max-w-4xl mx-auto">
             {!spec && <StartMode />}
 
