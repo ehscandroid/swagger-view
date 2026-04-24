@@ -27,7 +27,7 @@ const SwaggerView: React.FC = () => {
     if (swaggerUrl) {
       const isExternal = swaggerUrl.startsWith('http://') || swaggerUrl.startsWith('https://');
       const host = isExternal ? new URL(swaggerUrl).origin : window.location.origin;
-      console.log('[SwaggerView] Checking host availability', { host });
+      console.log('[SwaggerView] Checking host availability', { host, isExternal });
       setHostStatus('pinging');
       fetch(host, { method: 'HEAD' })
         .then(() => {
@@ -38,8 +38,8 @@ const SwaggerView: React.FC = () => {
           console.log('[SwaggerView] Host is offline', { host });
           setHostStatus('offline');
         });
-      console.log('[SwaggerView] Checking swagger file exists', { swaggerUrl });
-      fetch(swaggerUrl, { method: 'HEAD' })
+      console.log('[SwaggerView] Checking swagger file exists', { swaggerUrl, fetchUrl: window.location.origin + swaggerUrl });
+      fetch(window.location.origin + swaggerUrl, { method: 'HEAD' })
         .then((res) => {
           console.log('[SwaggerView] Swagger file check response', { status: res.status, ok: res.ok });
           if (res.ok) {
@@ -60,7 +60,7 @@ const SwaggerView: React.FC = () => {
     console.log('[SwaggerView] loadSwaggerFromUrl called', { urlOrPath });
     const isExternal = urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://');
     const host = isExternal ? new URL(urlOrPath).origin : window.location.origin;
-    console.log('[SwaggerView] Pinging host', { host });
+    console.log('[SwaggerView] Pinging host', { host, isExternal });
     setHostStatus('pinging');
     try {
       await fetch(host, { method: 'HEAD' });
@@ -86,7 +86,8 @@ const SwaggerView: React.FC = () => {
 
   const fetchSpec = async (specUrl: string) => {
     const isExternal = specUrl.startsWith('http://') || specUrl.startsWith('https://');
-    const fetchUrl = isExternal ? `/api/${specUrl}` : specUrl;
+    const fetchUrl = isExternal ? `/api/${specUrl}` : window.location.origin + specUrl;
+    console.log('[SwaggerView] fetchSpec', { specUrl, fetchUrl });
     const res = await fetch(fetchUrl);
     if (!res.ok) throw new Error('Failed to fetch spec');
     return await res.json();
@@ -107,14 +108,17 @@ const SwaggerView: React.FC = () => {
   };
 
   const loadFromPath = async (path: string) => {
+    console.log('[SwaggerView] loadFromPath called', { path });
     setLoading(true);
     setError('');
     try {
       const data = await fetchSpec(path);
+      console.log('[SwaggerView] Spec loaded successfully', { path, hasServers: !!data.servers });
       setSpec(data);
       setBaseUrl(data.servers?.[0]?.url || '');
       setUrl(path);
     } catch (e) {
+      console.log('[SwaggerView] Failed to load spec', { path, error: e instanceof Error ? e.message : 'Unknown error' });
       setError(e instanceof Error ? e.message : 'Failed to load spec');
     } finally {
       setLoading(false);
