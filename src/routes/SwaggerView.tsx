@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { isMobile } from 'react-device-detect';
 import { EndpointCard } from '../components/EndpointCard';
 import { OpenAPISchema, Operation, ExecState, getExample } from '../Interfaces';
 
@@ -13,10 +14,25 @@ const SwaggerView: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState<string>('');
   const [startModalOpen, setStartModalOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
+  const [autoLoaded, setAutoLoaded] = useState(false);
+  const [hostStatus, setHostStatus] = useState<'pinging' | 'online' | 'offline' | null>(null);
 
   useEffect(() => {
     document.body.className = darkMode ? 'bg-gray-800' : 'bg-gray-100';
   }, [darkMode]);
+
+  useEffect(() => {
+    const swaggerUrl = import.meta.env.VITE_SWAGGER_URL;
+    if (swaggerUrl) {
+      const isExternal = swaggerUrl.startsWith('http://') || swaggerUrl.startsWith('https://');
+      const host = isExternal ? new URL(swaggerUrl).origin : window.location.origin;
+      setHostStatus('pinging');
+      fetch(host, { method: 'HEAD' })
+        .then(() => setHostStatus('online'))
+        .catch(() => setHostStatus('offline'));
+      loadFromPath(swaggerUrl).then(() => setAutoLoaded(true));
+    }
+  }, []);
 
   const toggleDarkMode = () => setDarkMode(prev => !prev);
   const toggleEndpoint = (key: string) => {
@@ -164,7 +180,7 @@ const SwaggerView: React.FC = () => {
   const border = darkMode ? 'border-gray-700' : 'border-gray-200';
 
   const SideBar = () => {
-    return (<aside className={`w-64 flex-shrink-0 flex flex-col ${bg2} ${text}`}>
+    return (<aside className={`w-64 flex-shrink-0 flex flex-col fixed left-0 top-18 bottom-0 ${bg2} ${text}`}>
       <nav className={`p-2 space-y-1 overflow-y-auto flex-1`}>
         <button onClick={() => setSelectedSection('')} className={`w-full text-left px-3 py-2 rounded-md transition-colors ${selectedSection === '' ? (darkMode ? 'bg-gray-700 font-medium' : 'bg-gray-200 font-medium') : (darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100')}`}>Overview</button>
         {spec && (spec.tags || []).map(tag => (
@@ -224,7 +240,7 @@ const SwaggerView: React.FC = () => {
         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
         }`}
     >
-      <svg width="48" height="48" version="1.1"  viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+      <svg width="48" height="48" version="1.1" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
         <path className="fill-gray-400 dark:fill-gray-400" d="m24.128 5.2663v8.408e-4c-10.272-8.26e-5 -18.598 8.4051-18.598 18.774-0.085192 14.417 11.884 22.101 25.961 17.229 5.3743-1.546 3.5591-6.3083-0.11584-5.1986-14.999 6.0417-20.683-4.4561-20.909-12.03-3.67e-4 -7.7042 6.1283-13.95 13.69-13.95 6.2741 0.0024 12.256 4.0427 12.997 10.412 0.82673 3.1288-0.91666 9.4799-3.6329 7.5369-2.4055-3.3944-0.94503-5.8566-1.2019-9.8223-0.3473-3.3849-4.611-2.8937-4.7342 0.08183 0.13232 5.7302-0.57086 9.6725-3.3232 9.8888-4.0825-0.49856-2.8515-5.3682-3.1189-9.5983-0.05101-1.3896-1.1558-2.8008-2.5911-2.8008-1.4353 0-2.5904 1.1197-2.5904 2.5101-0.28976 4.4433-0.74476 11.937 3.7391 13.635 2.2219 1.0214 5.9792 1.3615 7.61-0.38732 1.1055-1.1852 1.5331-1.1276 3.2436 0.5385 1.7356 0.98047 3.0591 1.0905 4.8766 1.0661 6.974-1.4794 7.2961-8.6031 6.9496-12.676-1.1936-9.1068-9.2944-15.191-18.252-15.21z" />
       </svg>
     </button>)
@@ -232,37 +248,36 @@ const SwaggerView: React.FC = () => {
   }
 
   const Header = () => {
-  return (
-    <header
-      className={`h-16 flex items-center justify-between pl-3 pr-6 flex-shrink-0 ${bg2} ${border} border-b`} >
-      <div className="flex items-center gap-3">
-        <UpsortedSVGSmall />
-        <h1 className={`text-lg font-semibold ${text}`}>
-          Swagger View
-        </h1>
-      </div>
-      <div className="flex items-center gap-2">
-        {spec && (
-          <button
-            onClick={() => setStartModalOpen(true)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
-              darkMode
-                ? 'bg-white text-gray-900 hover:bg-gray-200'
-                : 'bg-gray-800 text-white hover:bg-gray-700'
-            }`}
-          >
-            New
-          </button>
-        )}
+    return (
+      <header
+        className={`h-16 flex items-center justify-between pl-3 pr-6 flex-shrink-0 fixed top-0 left-0 right-0 z-50 ${bg2} ${border} border-b`} >
+        <div className="flex items-center gap-3">
+          <UpsortedSVGSmall />
+          <h1 className={`text-lg font-semibold ${text}`}>
+            Swagger View
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {spec && (
+            <button
+              onClick={() => setStartModalOpen(true)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${darkMode
+                  ? 'bg-white text-gray-900 hover:bg-gray-200'
+                  : 'bg-gray-800 text-white hover:bg-gray-700'
+                }`}
+            >
+              New
+            </button>
+          )}
 
-        <DarkModeToggle />
-      </div>
-    </header>
-  );
-};
+          <DarkModeToggle />
+        </div>
+      </header>
+    );
+  };
 
   const Headers = () => {
-    return (<header className={`h-16 flex items-center justify-between px-6 flex-shrink-0 ${bg2} ${border} border-b`}>
+    return (<header className={`h-16 flex items-center justify-between px-6 flex-shrink-0 fixed top-0 left-0 right-0 z-50 ${bg2} ${border} border-b`}>
       <div />
       <div className="flex items-center gap-2">
         {spec && <button onClick={() => setStartModalOpen(true)} className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${darkMode ? 'bg-white text-gray-900 hover:bg-gray-200' : 'bg-gray-800 text-white hover:bg-gray-700'}`}>New</button>}
@@ -276,6 +291,12 @@ const SwaggerView: React.FC = () => {
     return (
       <div className="text-center py-20">
         <h2 className={`text-3xl font-bold mb-4 ${text}`}>Welcome to Swagger View</h2>
+        {autoLoaded && <p className={`mb-4 text-green-400`}>Auto-loaded from config</p>}
+        {hostStatus && (
+          <p className={`mb-4 text-sm ${hostStatus === 'pinging' ? 'text-yellow-400' : hostStatus === 'online' ? 'text-green-400' : 'text-red-400'}`}>
+            {hostStatus === 'pinging' ? 'Checking host...' : hostStatus === 'online' ? 'Host online' : 'Host offline'}
+          </p>
+        )}
         <p className={`mb-8 ${text2}`}>Load an OpenAPI spec to explore the API documentation</p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-lg mx-auto mb-6">
           <input type="text" placeholder="Paste your OpenAPI URL here..." value={url} onChange={e => setUrl(e.target.value)} className={`flex-1 px-5 py-3 rounded-lg border ${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500'} focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none`} />
@@ -315,137 +336,62 @@ const SwaggerView: React.FC = () => {
     );
   };
 
-return (
-  <div className="flex flex-col min-h-screen overflow-x-hidden">
-    {/* Header FULL WIDTH */}
-    <Header />
-
-    {/* Content BELOW header */}
-    <div className="flex flex-1 overflow-hidden">
-      {spec && <SideBar />}
-
-      <main className={`flex-1 overflow-y-auto p-6 ${bg}`}>
-        <div className="max-w-4xl mx-auto">
-          {!spec && <StartMode />}
-
-          {spec && selectedSection === '' && (
-            <div className="space-y-8">
-              <div className="text-center">
-                <p className={`text-sm uppercase tracking-widest mb-2 ${text2}`}>
-                  {spec.info.version}
-                </p>
-                <h2 className={`text-3xl font-bold mb-4 ${text}`}>
-                  {spec.info.title}
-                </h2>
-                {spec.info.description && (
-                  <p className={`max-w-2xl mx-auto ${text2}`}>
-                    {spec.info.description}
-                  </p>
-                )}
-
-                <div className="mt-4 flex justify-center">
-                  <input
-                    type="text"
-                    placeholder="Base URL"
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    className={`px-4 py-2 rounded-lg border text-sm w-full sm:w-64 ${
-                      darkMode
-                        ? 'border-gray-600 bg-gray-700 text-white'
-                        : 'border-gray-300 bg-white text-gray-900'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {Object.entries(grouped).map(([tagName, endpoints]) => (
-                  <div key={tagName}>
-                    <h3 className={`text-xl font-bold mb-3 ${text}`}>
-                      {tagName}
-                    </h3>
-                    <div className="space-y-3">
-                      {endpoints.map(({ path, method, operation }, idx) => (
-                        <EndpointCard
-                          key={`${path}-${method}-${idx}`}
-                          path={path}
-                          method={method}
-                          operation={operation}
-                          idx={idx}
-                          getExecState={getExecState}
-                          setExecState={(k, s) => setExecState(k, s)}
-                          execute={execute}
-                          expandedEndpoints={expandedEndpoints}
-                          toggleEndpoint={toggleEndpoint}
-                          darkMode={darkMode}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {spec && selectedSection !== '' &&
-            (() => {
-              const [pathStr, methodStr] = selectedSection.split('::');
-              const pathItem = spec.paths[pathStr];
-              const operation = pathItem?.[methodStr] as Operation;
-              if (!operation) return null;
-
-              return (
-                <EndpointCard
-                  key={selectedSection}
-                  path={pathStr}
-                  method={methodStr}
-                  operation={operation}
-                  idx={0}
-                  getExecState={getExecState}
-                  setExecState={(k, s) => setExecState(k, s)}
-                  execute={execute}
-                  expandedEndpoints={expandedEndpoints}
-                  toggleEndpoint={toggleEndpoint}
-                  darkMode={darkMode}
-                />
-              );
-            })()}
-        </div>
-      </main>
-    </div>
-
-    {startModalOpen && <StartModal />}
-  </div>
-);
-
-
   return (
-    <div className="flex min-h-screen overflow-x-hidden">
-      {spec && <SideBar />}
-      <div className="flex flex-col flex-1">
-        <Header />
+    <div className="flex flex-col min-h-screen overflow-x-hidden">
+      {/* Header FULL WIDTH */}
+      <Header />
 
-        <main className={`flex-1 overflow-y-auto p-6 ${bg}`} style={{ minHeight: 'calc(100vh - 4rem)' }}>
+      {/* Content BELOW header */}
+      <div className="flex flex-1 overflow-hidden">
+        {spec && !isMobile && <SideBar />}
+
+        <main className={`flex-1 overflow-y-auto p-6 ${bg}`} style={{ paddingTop: '6rem', paddingLeft: !isMobile ? '16rem' : '' }}>
           <div className="max-w-4xl mx-auto">
             {!spec && <StartMode />}
 
             {spec && selectedSection === '' && (
               <div className="space-y-8">
                 <div className="text-center">
-                  <p className={`text-sm uppercase tracking-widest mb-2 ${text2}`}>{spec.info.version}</p>
-                  <h2 className={`text-3xl font-bold mb-4 ${text}`}>{spec.info.title}</h2>
-                  {spec.info.description && <p className={`max-w-2xl mx-auto ${text2}`}>{spec.info.description}</p>}
-                  <div className="mt-4 flex justify-center">
+                  <p className={`text-sm uppercase tracking-widest mb-2 ${text2}`}>
+                    {spec.info.version}
+                  </p>
+                  <h2 className={`text-3xl font-bold mb-4 ${text}`}>
+                    {spec.info.title}
+                  </h2>
+                  {spec.info.description && (
+                    <p className={`max-w-2xl mx-auto ${text2}`}>
+                      {spec.info.description}
+                    </p>
+                  )}
+
+                  <div className="mt-4 flex justify-center items-center gap-2.5">
                     <input type="text" placeholder="Base URL" value={baseUrl} onChange={e => setBaseUrl(e.target.value)} className={`px-4 py-2 rounded-lg border text-sm w-full sm:w-64 ${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'}`} />
+                    {hostStatus === 'online' && <span className="text-green-400">✓</span>}
                   </div>
+
                 </div>
+
                 <div className="space-y-4">
                   {Object.entries(grouped).map(([tagName, endpoints]) => (
                     <div key={tagName}>
-                      <h3 className={`text-xl font-bold mb-3 ${text}`}>{tagName}</h3>
+                      <h3 className={`text-xl font-bold mb-3 ${text}`}>
+                        {tagName}
+                      </h3>
                       <div className="space-y-3">
                         {endpoints.map(({ path, method, operation }, idx) => (
-                          <EndpointCard key={`${path}-${method}-${idx}`} path={path} method={method} operation={operation} idx={idx} getExecState={getExecState} setExecState={(k, s) => setExecState(k, s)} execute={execute} expandedEndpoints={expandedEndpoints} toggleEndpoint={toggleEndpoint} darkMode={darkMode} />
+                          <EndpointCard
+                            key={`${path}-${method}-${idx}`}
+                            path={path}
+                            method={method}
+                            operation={operation}
+                            idx={idx}
+                            getExecState={getExecState}
+                            setExecState={(k, s) => setExecState(k, s)}
+                            execute={execute}
+                            expandedEndpoints={expandedEndpoints}
+                            toggleEndpoint={toggleEndpoint}
+                            darkMode={darkMode}
+                          />
                         ))}
                       </div>
                     </div>
@@ -454,19 +400,37 @@ return (
               </div>
             )}
 
-            {spec && selectedSection !== '' && (() => {
-              const [pathStr, methodStr] = selectedSection.split('::');
-              const pathItem = spec.paths[pathStr];
-              const operation = pathItem?.[methodStr] as Operation;
-              if (!operation) return null;
-              return <EndpointCard key={selectedSection} path={pathStr} method={methodStr} operation={operation} idx={0} getExecState={getExecState} setExecState={(k, s) => setExecState(k, s)} execute={execute} expandedEndpoints={expandedEndpoints} toggleEndpoint={toggleEndpoint} darkMode={darkMode} />;
-            })()}
+            {spec && selectedSection !== '' &&
+              (() => {
+                const [pathStr, methodStr] = selectedSection.split('::');
+                const pathItem = spec.paths[pathStr];
+                const operation = pathItem?.[methodStr] as Operation;
+                if (!operation) return null;
+
+                return (
+                  <EndpointCard
+                    key={selectedSection}
+                    path={pathStr}
+                    method={methodStr}
+                    operation={operation}
+                    idx={0}
+                    getExecState={getExecState}
+                    setExecState={(k, s) => setExecState(k, s)}
+                    execute={execute}
+                    expandedEndpoints={expandedEndpoints}
+                    toggleEndpoint={toggleEndpoint}
+                    darkMode={darkMode}
+                  />
+                );
+              })()}
           </div>
         </main>
       </div>
+
       {startModalOpen && <StartModal />}
     </div>
   );
+
 };
 
 export default SwaggerView;

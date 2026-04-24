@@ -121,7 +121,7 @@ export const EndpointCard: React.FC<EndpointCardProps> = ({
 
       {showCurl && (
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-2"><h5 className={`text-sm font-medium ${text}`}>cURL</h5><button onClick={handleCopyCurl} className={`text-xs ${text3} hover:${text}`}>{copied ? '✓ Copied!' : 'Copy'}</button></div>
+          <div className="flex items-center justify-between mb-2 mt-2"><h5 className={`text-sm font-medium ${text}`}>cURL</h5><button onClick={handleCopyCurl} className={`text-xs ${text3} hover:${text}`}>{copied ? '✓ Copied!' : 'Copy'}</button></div>
           <div className={`w-full py-3 px-4 rounded-xl ${bg3} overflow-x-auto`}><pre className={`font-mono text-sm whitespace-pre-wrap ${text}`}><code>{generateCurl()}</code></pre></div>
         </div>
       )}
@@ -150,7 +150,7 @@ export const EndpointCard: React.FC<EndpointCardProps> = ({
           <span className={`ml-auto text-sm ${text3}`}>{isExpanded ? '▲ Less' : '▼ More'}</span>
         </div>
         <h4 className={`text-xl font-serif font-semibold mb-2 ${text} group-hover:text-blue-400 transition-colors`}>{operation.summary}</h4>
-        {operation.description && <p className={`${text2} text-lg leading-relaxed mb-6`}>{operation.description}</p>}
+        {operation.description && <p className={`${text2} text-lg leading-relaxed mb-2`}>{operation.description}</p>}
       </div>
     </button>)
   }
