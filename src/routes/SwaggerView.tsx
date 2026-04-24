@@ -30,9 +30,28 @@ const SwaggerView: React.FC = () => {
       fetch(host, { method: 'HEAD' })
         .then(() => setHostStatus('online'))
         .catch(() => setHostStatus('offline'));
-      loadFromPath(swaggerUrl).then(() => setAutoLoaded(true));
+      fetch(swaggerUrl, { method: 'HEAD' })
+        .then((res) => {
+          if (res.ok) {
+            loadSwaggerFromUrl(swaggerUrl).then(() => setAutoLoaded(true));
+          }
+        })
+        .catch(() => {});
     }
   }, []);
+
+  const loadSwaggerFromUrl = async (urlOrPath: string) => {
+    const isExternal = urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://');
+    const host = isExternal ? new URL(urlOrPath).origin : window.location.origin;
+    setHostStatus('pinging');
+    try {
+      await fetch(host, { method: 'HEAD' });
+      setHostStatus('online');
+    } catch {
+      setHostStatus('offline');
+    }
+    await loadFromPath(urlOrPath);
+  };
 
   const toggleDarkMode = () => setDarkMode(prev => !prev);
   const toggleEndpoint = (key: string) => {
