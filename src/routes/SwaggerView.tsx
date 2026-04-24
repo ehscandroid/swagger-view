@@ -23,33 +23,54 @@ const SwaggerView: React.FC = () => {
 
   useEffect(() => {
     const swaggerUrl = import.meta.env.VITE_SWAGGER_URL;
+    console.log('[SwaggerView] Starting auto-load check', { swaggerUrl });
     if (swaggerUrl) {
       const isExternal = swaggerUrl.startsWith('http://') || swaggerUrl.startsWith('https://');
       const host = isExternal ? new URL(swaggerUrl).origin : window.location.origin;
+      console.log('[SwaggerView] Checking host availability', { host });
       setHostStatus('pinging');
       fetch(host, { method: 'HEAD' })
-        .then(() => setHostStatus('online'))
-        .catch(() => setHostStatus('offline'));
+        .then(() => {
+          console.log('[SwaggerView] Host is online', { host });
+          setHostStatus('online');
+        })
+        .catch(() => {
+          console.log('[SwaggerView] Host is offline', { host });
+          setHostStatus('offline');
+        });
+      console.log('[SwaggerView] Checking swagger file exists', { swaggerUrl });
       fetch(swaggerUrl, { method: 'HEAD' })
         .then((res) => {
+          console.log('[SwaggerView] Swagger file check response', { status: res.status, ok: res.ok });
           if (res.ok) {
-            loadSwaggerFromUrl(swaggerUrl).then(() => setAutoLoaded(true));
+            console.log('[SwaggerView] Loading swagger spec', { swaggerUrl });
+            loadSwaggerFromUrl(swaggerUrl).then(() => {
+              console.log('[SwaggerView] Auto-load complete');
+              setAutoLoaded(true);
+            });
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.log('[SwaggerView] Swagger file not found', { swaggerUrl, error: err.message });
+        });
     }
   }, []);
 
   const loadSwaggerFromUrl = async (urlOrPath: string) => {
+    console.log('[SwaggerView] loadSwaggerFromUrl called', { urlOrPath });
     const isExternal = urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://');
     const host = isExternal ? new URL(urlOrPath).origin : window.location.origin;
+    console.log('[SwaggerView] Pinging host', { host });
     setHostStatus('pinging');
     try {
       await fetch(host, { method: 'HEAD' });
+      console.log('[SwaggerView] Host ping successful');
       setHostStatus('online');
     } catch {
+      console.log('[SwaggerView] Host ping failed');
       setHostStatus('offline');
     }
+    console.log('[SwaggerView] Calling loadFromPath', { urlOrPath });
     await loadFromPath(urlOrPath);
   };
 
